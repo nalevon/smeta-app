@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Электромонтаж: Смета & Прайс</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 90px; }
+    
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 1.15rem; font-weight: 700; color: #fff; }
+    header .status { font-size: 0.8rem; color: var(--text-muted); }
+
+    .nav-tabs {
+      display: flex;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 14px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .container { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+    /* Voice input section */
+    .voice-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .mic-btn {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      border: none;
+      background: var(--accent);
+      color: #0f172a;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);
+      transition: transform 0.15s, background 0.2s;
+    }
+    .mic-btn:active { transform: scale(0.94); }
+    .mic-btn.recording {
+      background: var(--danger);
+      color: #fff;
+      animation: pulse 1.4s infinite;
+      box-shadow: 0 4px 20px rgba(239, 68, 68, 0.5);
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+    .voice-status { margin-top: 12px; font-size: 0.9rem; color: var(--text-muted); }
+    
+    .manual-input {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: #fff;
+      padding: 12px;
+      margin-top: 14px;
+      resize: vertical;
+      min-height: 70px;
+      font-size: 0.95rem;
+    }
+
+    .btn-parse {
+      width: 100%;
+      background: var(--accent);
+      color: #0f172a;
+      font-weight: 700;
+      border: none;
+      padding: 12px;
+      border-radius: 10px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    /* Result Estimate Table */
+    .estimate-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .estimate-header {
+      padding: 14px 16px;
+      background: #182234;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+    }
+    .estimate-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .estimate-item:last-child { border-bottom: none; }
+    .item-name { font-size: 0.95rem; font-weight: 500; }
+    .item-details { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+    .item-sum { font-size: 1rem; font-weight: 700; color: var(--accent); }
+
+    .total-box {
+      padding: 16px;
+      background: #182234;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border);
+    }
+    .total-title { font-size: 1.1rem; font-weight: 600; }
+    .total-amount { font-size: 1.4rem; font-weight: 800; color: var(--success); }
+
+    .action-btn {
+      width: 100%;
+      background: #334155;
+      color: #fff;
+      font-weight: 600;
+      border: none;
+      padding: 13px;
+      border-radius: 10px;
+      margin-top: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .action-btn:active { background: #475569; }
+
+    /* Price edit list */
+    .price-row {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .price-name { font-size: 0.95rem; font-weight: 500; flex: 1; }
+    .price-unit { font-size: 0.75rem; color: var(--text-muted); }
+    .price-input-wrapper { display: flex; align-items: center; gap: 6px; }
+    .price-input {
+      width: 90px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #fff;
+      padding: 6px 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-align: right;
+    }
+    .del-btn {
+      background: none;
+      border: none;
+      color: var(--danger);
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+
+    .add-service-form {
+      background: var(--card-bg);
+      border: 1px dashed var(--accent);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 20px;
+    }
+    .add-service-form input {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #fff;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>⚡ Электромонтаж</h1>
+      <div class="status">Калькулятор и голосовая смета</div>
+    </div>
+  </header>
+
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('estimate')">Смета</button>
+    <button class="tab-btn" onclick="switchTab('prices')">Прайс-лист</button>
+  </div>
+
+  <div class="container">
+    
+    <!-- Вкладка: Смета -->
+    <div id="tab-estimate">
+      <div class="voice-panel">
+        <button id="micBtn" class="mic-btn" onclick="toggleVoice()">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+          </svg>
+        </button>
+        <div id="voiceStatus" class="voice-status">Нажмите для голосового ввода</div>
+        <textarea id="manualText" class="manual-input" placeholder="Или напишите текстом: 100м кабеля в гофре, 3 розетки, 5 светильников..."></textarea>
+        <button class="btn-parse" onclick="processText()">Рассчитать смету</button>
+      </div>
+
+      <div id="estimateCard" class="estimate-card hidden">
+        <div class="estimate-header">
+          <span>Сформированная смета</span>
+          <span id="itemsCount" style="color: var(--text-muted); font-size: 0.85rem;"></span>
+        </div>
+        <div id="estimateList"></div>
+        <div class="total-box">
+          <div class="total-title">ИТОГО:</div>
+          <div id="totalSum" class="total-amount">0 ₽</div>
+        </div>
+      </div>
+
+      <button id="copyBtn" class="action-btn hidden" onclick="copyEstimate()">
+        📋 Скопировать смету текстом
+      </button>
+    </div>
+
+    <!-- Вкладка: Редактор прайса -->
+    <div id="tab-prices" class="hidden">
+      <div id="priceListContainer"></div>
+
+      <div class="add-service-form">
+        <h3 style="font-size: 1rem; margin-bottom: 12px; color: var(--accent);">+ Добавить новую услугу</h3>
+        <input type="text" id="newName" placeholder="Название (например: Монтаж щитка 24м)">
+        <input type="text" id="newUnit" placeholder="Ед. изм. (шт., пог. м)">
+        <input type="number" id="newPrice" placeholder="Цена, ₽">
+        <button class="btn-parse" onclick="addNewPrice()">Добавить в прайс</button>
+      </div>
+
+      <button class="action-btn" style="margin-top: 15px; color: var(--text-muted);" onclick="resetPricesToDefault()">
+        🔄 Сбросить прайс к начальному
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    // Базовый прейскурант по умолчанию
+    const DEFAULT_PRICES = [
+      { id: 1, name: "Штробление стены (бетон)", unit: "пог. м", price: 700, keys: ["штробление бетон", "штроба бетон", "штробы бетон"] },
+      { id: 2, name: "Штробление стены (кирпич)", unit: "пог. м", price: 500, keys: ["штробление кирпич", "штроба кирпич", "штробы кирпич"] },
+      { id: 3, name: "Отверстия под подрозетники (бетон)", unit: "шт.", price: 1000, keys: ["подрозетник бетон", "высверливание бетон", "отверстие бетон"] },
+      { id: 4, name: "Отверстия под подрозетники (кирпич)", unit: "шт.", price: 500, keys: ["подрозетник кирпич", "высверливание кирпич", "отверстие кирпич"] },
+      { id: 5, name: "Установка и вмазка подрозетника", unit: "шт.", price: 150, keys: ["вмазка подрозетника", "установка подрозетника", "вмазать"] },
+      { id: 6, name: "Замазка штроб", unit: "пог. м", price: 150, keys: ["замазка штроб", "замазать штробу", "заделка штроб"] },
+      { id: 7, name: "Установка розеток", unit: "шт.", price: 300, keys: ["розетка", "розеток", "розетки"] },
+      { id: 8, name: "Установка выключателей", unit: "шт.", price: 300, keys: ["выключатель", "выключателей", "выключатели"] },
+      { id: 9, name: "Установка люстры", unit: "шт.", price: 1000, keys: ["люстра", "люстры", "люстр"] },
+      { id: 10, name: "Установка светильника", unit: "шт.", price: 300, keys: ["светильник", "светильников", "светильника", "спот", "точечный"] },
+      { id: 11, name: "Прокладка кабеля без гофры", unit: "пог. м", price: 120, keys: ["кабель", "кабеля", "прокладка кабеля"] },
+      { id: 12, name: "Прокладка кабеля в гофре", unit: "пог. м", price: 150, keys: ["кабель в гофре", "кабеля в гофре", "гофра", "гофре"] },
+      { id: 13, name: "Расключение распредкоробок", unit: "шт.", price: 800, keys: ["коробка", "распайка", "распредкоробка", "распаечная"] },
+      { id: 14, name: "Проходное отверстие", unit: "шт.", price: 400, keys: ["проходное", "отверстие в стене", "проходка"] },
+      { id: 15, name: "Демонтаж точек", unit: "шт.", price: 50, keys: ["демонтаж", "снять розетку", "демонтировать"] },
+      { id: 16, name: "Расключение щита до 12 модулей", unit: "шт.", price: 15000, keys: ["щит", "щита", "модулей", "сборка щита"] },
+      { id: 17, name: "Наращивание кабеля гильзами ГМЛ", unit: "шт.", price: 800, keys: ["гмл", "наращивание", "гильзами", "нарастить"] },
+      { id: 18, name: "Установка датчика движения", unit: "шт.", price: 1000, keys: ["датчик движения", "датчика движения", "д/д"] },
+      { id: 19, name: "Установка КЛК-5", unit: "шт.", price: 1000, keys: ["клк5", "клк", "клк-5"] },
+      { id: 20, name: "Подключение духового шкафа", unit: "шт.", price: 500, keys: ["духовой шкаф", "духовки", "духовка"] },
+      { id: 21, name: "Подключение варочной панели", unit: "шт.", price: 500, keys: ["варочная панель", "варочной", "плита"] }
+    ];
+
+    let currentPrices = [];
+    let currentEstimate = [];
+
+    // Загрузка прайса из памяти (localStorage)
+    function loadPrices() {
+      const saved = localStorage.getItem('electro_prices');
+      if (saved) {
+        try { currentPrices = JSON.parse(saved); } catch(e) { currentPrices = [...DEFAULT_PRICES]; }
+      } else {
+        currentPrices = [...DEFAULT_PRICES];
+      }
+      renderPriceEditor();
+    }
+
+    function savePrices() {
+      localStorage.setItem('electro_prices', JSON.stringify(currentPrices));
+      renderPriceEditor();
+    }
+
+    function resetPricesToDefault() {
+      if (confirm("Вернуть исходные расценки прайса?")) {
+        currentPrices = JSON.parse(JSON.stringify(DEFAULT_PRICES));
+        savePrices();
+      }
+    }
+
+    // Рендер редактора цен
+    function renderPriceEditor() {
+      const container = document.getElementById('priceListContainer');
+      container.innerHTML = '';
+      currentPrices.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'price-row';
+        div.innerHTML = `
+          <div class="price-name">
+            ${item.name}
+            <div class="price-unit">${item.unit}</div>
+          </div>
+          <div class="price-input-wrapper">
+            <input type="number" class="price-input" value="${item.price}" onchange="updatePriceValue(${index}, this.value)">
+            <span>₽</span>
+            <button class="del-btn" onclick="deletePriceItem(${index})" title="Удалить">✕</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function updatePriceValue(index, val) {
+      const parsed = parseInt(val, 10);
+      if (!isNaN(parsed)) {
+        currentPrices[index].price = parsed;
+        savePrices();
+      }
+    }
+
+    function deletePriceItem(index) {
+      if (confirm(`Удалить "${currentPrices[index].name}" из прайса?`)) {
+        currentPrices.splice(index, 1);
+        savePrices();
+      }
+    }
+
+    function addNewPrice() {
+      const name = document.getElementById('newName').value.trim();
+      const unit = document.getElementById('newUnit').value.trim() || 'шт.';
+      const price = parseInt(document.getElementById('newPrice').value, 10);
+
+      if (!name || isNaN(price)) {
+        alert("Пожалуйста, укажите название и корректную цену.");
+        return;
+      }
+
+      currentPrices.push({
+        id: Date.now(),
+        name: name,
+        unit: unit,
+        price: price,
+        keys: [name.toLowerCase()]
+      });
+
+      document.getElementById('newName').value = '';
+      document.getElementById('newUnit').value = '';
+      document.getElementById('newPrice').value = '';
+      savePrices();
+    }
+
+    // Вкладки
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (tab === 'estimate') {
+        document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+        document.getElementById('tab-estimate').classList.remove('hidden');
+        document.getElementById('tab-prices').classList.add('hidden');
+      } else {
+        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+        document.getElementById('tab-estimate').classList.add('hidden');
+        document.getElementById('tab-prices').classList.remove('hidden');
+      }
+    }
+
+    // Голосовой ввод
+    let recognition = null;
+    let isRecording = false;
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.lang = 'ru-RU';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        isRecording = true;
+        document.getElementById('micBtn').classList.add('recording');
+        document.getElementById('voiceStatus').innerText = "Слушаю... Надиктовывайте объём";
+      };
+
+      recognition.onresult = (event) => {
+        const text = event.results[0][0].transcript;
+        const input = document.getElementById('manualText');
+        input.value = (input.value ? input.value + " " : "") + text;
+        processText();
+      };
+
+      recognition.onerror = (e) => {
+        document.getElementById('voiceStatus').innerText = "Ошибка распознавания: " + e.error;
+        stopVoice();
+      };
+
+      recognition.onend = () => {
+        stopVoice();
+      };
+    }
+
+    function toggleVoice() {
+      if (!recognition) {
+        alert("Голосовой ввод не поддерживается данным браузером. Вы можете ввести текст в поле вручную.");
+        return;
+      }
+      if (isRecording) {
+        recognition.stop();
+      } else {
+        recognition.start();
+      }
+    }
+
+    function stopVoice() {
+      isRecording = false;
+      document.getElementById('micBtn').classList.remove('recording');
+      document.getElementById('voiceStatus').innerText = "Нажмите для голосового ввода";
+    }
+
+    // Словарь числительных и фильтр оговорок
+    const NUM_WORDS = {
+      'один': 1, 'одна': 1, 'одну': 1,
+      'два': 2, 'две': 2,
+      'три': 3,
+      'четыре': 4,
+      'пять': 5,
+      'шесть': 6,
+      'семь': 7,
+      'восемь': 8,
+      'девять': 9,
+      'десять': 10,
+      'двадцать': 20,
+      'тридцать': 30,
+      'сорок': 40,
+      'пятьдесят': 50,
+      'сто': 100,
+      'двести': 200
+    };
+
+    // Интеллектуальный парсинг надиктованного текста
+    function parseSpokenInput(rawText) {
+      let text = rawText.toLowerCase();
+
+      // Фильтрация оговорок вида "три, стоп, пять" -> "пять"
+      text = text.replace(/\b(\w+)\s+(стоп|нет|отмена|ой)\s+(\w+)\b/g, '$3');
+
+      // Преобразование текстовых числительных в цифры
+      for (const [w, n] of Object.entries(NUM_WORDS)) {
+        const regex = new RegExp(`\\b${w}\\b`, 'g');
+        text = text.replace(regex, n);
+      }
+
+      // Разбиваем на логические фрагменты
+      const parts = text.split(/[,;\n+]+|\s+(?:и|плюс|также)\s+/);
+      const results = [];
+
+      parts.forEach(part => {
+        const trimmed = part.trim();
+        if (!trimmed) return;
+
+        // Поиск количества (числа)
+        const matchNum = trimmed.match(/\b(\d+)\b/);
+        const qty = matchNum ? parseInt(matchNum[1], 10) : 1;
+
+        // Определяем позицию из актуального прайса
+        let matchedService = null;
+
+        // Проверяем по ключам с приоритетом специфичности (гофра > кабель и т.д.)
+        if (trimmed.includes('гофр')) {
+          matchedService = currentPrices.find(p => p.id === 12);
+        } else if (trimmed.includes('кабел') || trimmed.includes('провод')) {
+          matchedService = currentPrices.find(p => p.id === 11);
+        } else if (trimmed.includes('датчик')) {
+          matchedService = currentPrices.find(p => p.id === 18);
+        } else if (trimmed.includes('выключател')) {
+          matchedService = currentPrices.find(p => p.id === 8);
+        } else if (trimmed.includes('розет')) {
+          matchedService = currentPrices.find(p => p.id === 7);
+        } else if (trimmed.includes('светильник') || trimmed.includes('спот')) {
+          matchedService = currentPrices.find(p => p.id === 10);
+        } else if (trimmed.includes('люстр')) {
+          matchedService = currentPrices.find(p => p.id === 9);
+        } else if (trimmed.includes('клк')) {
+          matchedService = currentPrices.find(p => p.id === 19);
+        } else if (trimmed.includes('духов')) {
+          matchedService = currentPrices.find(p => p.id === 20);
+        } else if (trimmed.includes('варочн')) {
+          matchedService = currentPrices.find(p => p.id === 21);
+        } else if (trimmed.includes('щит')) {
+          matchedService = currentPrices.find(p => p.id === 16);
+        } else if (trimmed.includes('штроб') && trimmed.includes('бетон')) {
+          matchedService = currentPrices.find(p => p.id === 1);
+        } else if (trimmed.includes('штроб')) {
+          matchedService = currentPrices.find(p => p.id === 2);
+        } else if (trimmed.includes('короб')) {
+          matchedService = currentPrices.find(p => p.id === 13);
+        } else {
+          // Общий поиск по совпадению названия
+          matchedService = currentPrices.find(p
