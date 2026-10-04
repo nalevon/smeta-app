@@ -205,7 +205,7 @@
 <script>
 (function() {
   // ВСТАВЬТЕ СЮДА свой ключ с aistudio.google.com — между кавычками
-  var GEMINI_API_KEY = 'AQ.Ab8RN6Ix2Qhf_1gMSMABshDXnDDDBeJb_qSN3YM1JFCr7mkcXg';
+  var GEMINI_API_KEY = 'ВАШ_КЛЮЧ_СЮДА';
   var GEMINI_MODEL = 'gemini-flash-latest';
 
   var STORAGE_KEY = 'smeta_price_list_v3';
@@ -647,6 +647,10 @@
   document.getElementById('aiCalcBtn').addEventListener('click', calcAi);
 
   // --- запись голосом (по возможности) ---
+  // Важно: на Android Chrome режим continuous:true у распознавания речи часто
+  // "зацикливается" и повторяет одну и ту же фразу много раз. Поэтому пишем
+  // короткими фразами (continuous:false) и сами перезапускаем запись, пока
+  // пользователь не нажмёт "стоп" — так дублирования не возникает.
   (function setupMic() {
     var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     var micBtn = document.getElementById('micBtn');
@@ -654,37 +658,59 @@
     var recognition = null;
     var recording = false;
     var baseText = '';
+    var restartTimer = null;
 
     micBtn.style.display = 'block';
 
+    function newRecognition() {
+      var r = new SpeechRec();
+      r.lang = 'ru-RU';
+      r.continuous = false;
+      r.interimResults = true;
+
+      r.onresult = function(event) {
+        var finalTranscript = '', interim = '';
+        for (var i = 0; i < event.results.length; i++) {
+          if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
+          else interim += event.results[i][0].transcript;
+        }
+        if (finalTranscript) baseText += finalTranscript + ' ';
+        document.getElementById('aiInput').value = baseText + interim;
+      };
+
+      r.onerror = function(event) {
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          micBtn.style.display = 'none';
+          document.getElementById('aiHint').textContent = 'Микрофон недоступен в этом окне — надиктуйте текст через микрофон на клавиатуре телефона.';
+          recording = false;
+        }
+        // 'no-speech' и подобные ошибки — просто пауза в речи, не прерываем запись
+      };
+
+      r.onend = function() {
+        document.getElementById('aiInput').value = baseText;
+        if (recording) {
+          // продолжаем слушать дальше, пока пользователь не нажмёт "стоп"
+          restartTimer = setTimeout(function() {
+            if (recording) {
+              try { recognition = newRecognition(); recognition.start(); }
+              catch (e) { stop(); }
+            }
+          }, 150);
+        } else {
+          micBtn.classList.remove('recording');
+          micBtn.textContent = '🎤 Записать голосом';
+        }
+      };
+
+      return r;
+    }
+
     function start() {
       try {
-        recognition = new SpeechRec();
-        recognition.lang = 'ru-RU';
-        recognition.continuous = true;
-        recognition.interimResults = true;
         baseText = document.getElementById('aiInput').value;
         if (baseText && !/\s$/.test(baseText)) baseText += ' ';
-
-        recognition.onresult = function(event) {
-          var finalTranscript = '', interim = '';
-          for (var i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
-            else interim += event.results[i][0].transcript;
-          }
-          if (finalTranscript) baseText += finalTranscript + ' ';
-          document.getElementById('aiInput').value = baseText + interim;
-        };
-        recognition.onerror = function(event) {
-          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            micBtn.style.display = 'none';
-            document.getElementById('aiHint').textContent = 'Микрофон недоступен в этом окне — надиктуйте текст через микрофон на клавиатуре телефона.';
-          }
-          stop();
-        };
-        recognition.onend = function() {
-          if (recording) { recording = false; micBtn.classList.remove('recording'); micBtn.textContent = '🎤 Записать голосом'; }
-        };
+        recognition = newRecognition();
         recognition.start();
         recording = true;
         micBtn.classList.add('recording');
@@ -695,8 +721,9 @@
     }
 
     function stop() {
-      if (recognition) { try { recognition.stop(); } catch (e) {} }
       recording = false;
+      clearTimeout(restartTimer);
+      if (recognition) { try { recognition.stop(); } catch (e) {} }
       micBtn.classList.remove('recording');
       micBtn.textContent = '🎤 Записать голосом';
     }
