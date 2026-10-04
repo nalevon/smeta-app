@@ -47,18 +47,10 @@
   .sub { color: var(--text-dim); font-size: 0.9rem; margin: 0 0 18px; line-height: 1.4; }
   .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
 
-  .seg { display: flex; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; margin-bottom: 14px; }
-  .seg button { flex: 1; background: none; border: none; border-radius: 7px; padding: 9px 4px; font-size: 0.85rem; font-weight: 600; color: var(--text-dim); font-family: var(--font); }
-  .seg button.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
-
-  .mode { display: none; }
-  .mode.active { display: block; }
-
   label.field-label { display: block; font-size: 0.82rem; color: var(--text-dim); margin-bottom: 6px; }
   textarea { width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 1rem; font-family: var(--font); resize: vertical; line-height: 1.5; }
   textarea:focus { outline: none; border-color: var(--accent); }
-  #aiInput { min-height: 100px; }
-  #manualInput { min-height: 90px; }
+  #aiInput { min-height: 120px; }
 
   .hint { font-size: 0.8rem; color: var(--text-dim); margin-top: 8px; line-height: 1.4; }
   .warn { font-size: 0.8rem; color: var(--danger); margin-top: 8px; line-height: 1.4; }
@@ -146,30 +138,12 @@
   <h1>⚡ Смета на заказ</h1>
   <p class="sub">Опишите задачу с объекта — калькулятор разложит её на порядок действий и посчитает по вашему прайсу.</p>
 
-  <div class="seg">
-    <button id="tabAi" class="active">🎙️ Голосом / описанием</button>
-    <button id="tabManual">📋 Списком вручную</button>
-  </div>
-
-  <div class="mode active" id="modeAi">
-    <div class="card">
-      <label class="field-label" for="aiInput">Что нужно сделать на объекте</label>
-      <textarea id="aiInput" placeholder="Например: перенести розетку для плиты на 50 см вниз, перенести обычную розетку вправо на 50 см и ещё одну на метр вверх с той же точки, всё в бетоне"></textarea>
-      <button class="btn-mic" id="micBtn" style="display:none;">🎤 Записать голосом</button>
-      <div class="hint" id="aiHint">Надиктуйте задачу своими словами — можно через кнопку записи или через микрофон на клавиатуре. Разбор учитывает материал стен, количество отверстий, метраж кабеля и типы соединений.</div>
-      <button class="btn-main" id="aiCalcBtn">Разобрать и посчитать</button>
-      <div id="aiThinking" class="thinking" style="display:none;"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span id="aiThinkingText">Думаю над порядком работ…</span></div>
-      <div id="aiError" class="warn" style="display:none;"></div>
-    </div>
-  </div>
-
-  <div class="mode" id="modeManual">
-    <div class="card">
-      <label class="field-label" for="manualInput">Позиции построчно</label>
-      <textarea id="manualInput" placeholder="Например:&#10;розетки 8&#10;выключатели 3&#10;кабель ввг 3х2.5 40&#10;автомат 16а 2"></textarea>
-      <div class="hint">Одна позиция — одна строка: название и количество. Ищет точное совпадение по вашему прайсу, без разбора порядка работ.</div>
-      <button class="btn-main" id="manualCalcBtn">Посчитать сумму</button>
-    </div>
+  <div class="card">
+    <label class="field-label" for="aiInput">Чтобы надиктовать, нажмите кнопку микрофона на клавиатуре</label>
+    <textarea id="aiInput" placeholder="Например: перенести розетку для плиты на 50 см вниз, перенести обычную розетку вправо на 50 см и ещё одну на метр вверх с той же точки, всё в бетоне"></textarea>
+    <button class="btn-main" id="aiCalcBtn">Разобрать и посчитать</button>
+    <div id="aiThinking" class="thinking" style="display:none;"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span id="aiThinkingText">Думаю над порядком работ…</span></div>
+    <div id="aiError" class="warn" style="display:none;"></div>
   </div>
 
   <div class="card" id="resultCard" style="display:none;">
@@ -205,7 +179,7 @@
 <script>
 (function() {
   // ВСТАВЬТЕ СЮДА свой ключ с aistudio.google.com — между кавычками
-  var GEMINI_API_KEY = 'AQ.Ab8RN6Ic8_nfrUCw-p44ASGb0Tmhts-uEiToqxbdHHgRcPGKuA';
+  var GEMINI_API_KEY = 'ВАШ_КЛЮЧ_СЮДА';
   var GEMINI_MODEL = 'gemini-flash-latest';
 
   var STORAGE_KEY = 'smeta_price_list_v3';
@@ -476,45 +450,7 @@
     card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // --- режим "вручную" (быстрый построчный разбор без ИИ) ---
-  function parseLine(line) {
-    var norm = normalize(line);
-    if (!norm) return null;
-    var numMatch = norm.match(/(\d+[.,]?\d*)/g);
-    var qty = 1, textPart = norm;
-    if (numMatch && numMatch.length) {
-      var lastNum = numMatch[numMatch.length - 1];
-      qty = parseFloat(lastNum.replace(',', '.'));
-      if (isNaN(qty) || qty <= 0) qty = 1;
-      var lastIdx = norm.lastIndexOf(lastNum);
-      textPart = (norm.slice(0, lastIdx) + ' ' + norm.slice(lastIdx + lastNum.length)).trim();
-    }
-    return { raw: line, qty: qty, text: textPart.trim() };
-  }
-
-  function calcManual() {
-    var raw = document.getElementById('manualInput').value;
-    var lines = raw.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-    if (!lines.length) {
-      lines = raw.split(/[,;]/).map(function(l) { return l.trim(); }).filter(Boolean);
-    }
-    var items = [], unmatched = [];
-    lines.forEach(function(line) {
-      var parsed = parseLine(line);
-      if (!parsed) return;
-      var item = fuzzyMatch(parsed.text);
-      if (item) {
-        items.push({ name: item.name, qty: parsed.qty, unit: item.unit, price: item.price });
-      } else {
-        unmatched.push(line);
-      }
-    });
-    renderResults({ items: items, unmatched: unmatched, plan: null, note: '' });
-  }
-
-  document.getElementById('manualCalcBtn').addEventListener('click', calcManual);
-
-  // --- режим "ИИ" (через Gemini) ---
+  // --- разбор через ИИ (Gemini) ---
   function buildPrompt(text) {
     var listForPrompt = prices.map(function(p) { return { name: p.name, unit: p.unit }; });
     return 'Ты помогаешь электромонтажнику разложить описание задачи на объекте на технологические операции и посчитать предварительную смету.\n\n' +
@@ -540,13 +476,10 @@
   function errorCopy(code) {
     switch (code) {
       case 'no_key': return 'В файле страницы не вставлен ключ Gemini (GEMINI_API_KEY). Откройте index.html и вставьте ключ с aistudio.google.com.';
-      case 'referrer_blocked': return 'Google заблокировал запрос с этого адреса — проверьте ограничение ключа по HTTP-referrer в Google Cloud Console.';
-      case 'bad_key': return 'Ключ Gemini не принят (неверный или удалён). Создайте новый на aistudio.google.com и вставьте в index.html.';
-      case 'rate_limited': return 'Исчерпан бесплатный дневной лимit запросов Gemini — попробуйте завтра, либо подключите платный тариф в Google AI Studio.';
+      case 'network': return 'Нет связи с сервером Google. Проверьте интернет и попробуйте снова.';
       case 'invalid_json': return 'ИИ ответил не в ожидаемом формате. Нажмите «Разобрать и посчитать» ещё раз.';
       case 'prompt_too_large': return 'Описание слишком длинное — сократите его.';
-      case 'network': return 'Нет связи с сервером Google. Проверьте интернет и попробуйте снова.';
-      default: return 'Временная ошибка (' + code + '). Попробуйте ещё раз через момент.';
+      default: return 'Ответ Google: ' + code;
     }
   }
 
@@ -583,10 +516,12 @@
     }
 
     if (!resp.ok) {
-      if (resp.status === 403) throw { code: 'referrer_blocked' };
-      if (resp.status === 400 || resp.status === 401) throw { code: 'bad_key' };
-      if (resp.status === 429) throw { code: 'rate_limited' };
-      throw { code: 'upstream_' + resp.status };
+      var detail = '';
+      try {
+        var errJson = await resp.json();
+        detail = (errJson && errJson.error && errJson.error.message) ? errJson.error.message : JSON.stringify(errJson).slice(0, 200);
+      } catch (e) {}
+      throw { code: resp.status + (detail ? ': ' + detail : ''), raw: true };
     }
 
     var data = await resp.json();
@@ -644,108 +579,6 @@
   }
 
   document.getElementById('aiCalcBtn').addEventListener('click', calcAi);
-
-  // --- запись голосом (по возможности) ---
-  // Важно: на Android Chrome режим continuous:true у распознавания речи часто
-  // "зацикливается" и повторяет одну и ту же фразу много раз. Поэтому пишем
-  // короткими фразами (continuous:false) и сами перезапускаем запись, пока
-  // пользователь не нажмёт "стоп" — так дублирования не возникает.
-  (function setupMic() {
-    var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    var micBtn = document.getElementById('micBtn');
-    if (!SpeechRec) { return; }
-    var recognition = null;
-    var recording = false;
-    var baseText = '';
-    var restartTimer = null;
-
-    micBtn.style.display = 'block';
-
-    function newRecognition() {
-      var r = new SpeechRec();
-      r.lang = 'ru-RU';
-      r.continuous = false;
-      r.interimResults = true;
-
-      r.onresult = function(event) {
-        var finalTranscript = '', interim = '';
-        for (var i = 0; i < event.results.length; i++) {
-          if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
-          else interim += event.results[i][0].transcript;
-        }
-        if (finalTranscript) baseText += finalTranscript + ' ';
-        document.getElementById('aiInput').value = baseText + interim;
-      };
-
-      r.onerror = function(event) {
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          micBtn.style.display = 'none';
-          document.getElementById('aiHint').textContent = 'Микрофон недоступен в этом окне — надиктуйте текст через микрофон на клавиатуре телефона.';
-          recording = false;
-        }
-        // 'no-speech' и подобные ошибки — просто пауза в речи, не прерываем запись
-      };
-
-      r.onend = function() {
-        document.getElementById('aiInput').value = baseText;
-        if (recording) {
-          // продолжаем слушать дальше, пока пользователь не нажмёт "стоп"
-          restartTimer = setTimeout(function() {
-            if (recording) {
-              try { recognition = newRecognition(); recognition.start(); }
-              catch (e) { stop(); }
-            }
-          }, 150);
-        } else {
-          micBtn.classList.remove('recording');
-          micBtn.textContent = '🎤 Записать голосом';
-        }
-      };
-
-      return r;
-    }
-
-    function start() {
-      try {
-        baseText = document.getElementById('aiInput').value;
-        if (baseText && !/\s$/.test(baseText)) baseText += ' ';
-        recognition = newRecognition();
-        recognition.start();
-        recording = true;
-        micBtn.classList.add('recording');
-        micBtn.textContent = '⏺ Идёт запись — нажмите, чтобы остановить';
-      } catch (e) {
-        micBtn.style.display = 'none';
-      }
-    }
-
-    function stop() {
-      recording = false;
-      clearTimeout(restartTimer);
-      if (recognition) { try { recognition.stop(); } catch (e) {} }
-      micBtn.classList.remove('recording');
-      micBtn.textContent = '🎤 Записать голосом';
-    }
-
-    micBtn.addEventListener('click', function() {
-      if (recording) stop(); else start();
-    });
-  })();
-
-  // --- переключение вкладок ---
-  var tabAi = document.getElementById('tabAi');
-  var tabManual = document.getElementById('tabManual');
-  var modeAi = document.getElementById('modeAi');
-  var modeManual = document.getElementById('modeManual');
-
-  tabAi.addEventListener('click', function() {
-    tabAi.classList.add('active'); tabManual.classList.remove('active');
-    modeAi.classList.add('active'); modeManual.classList.remove('active');
-  });
-  tabManual.addEventListener('click', function() {
-    tabManual.classList.add('active'); tabAi.classList.remove('active');
-    modeManual.classList.add('active'); modeAi.classList.remove('active');
-  });
 
   renderPriceTable();
 
